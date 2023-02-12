@@ -1,0 +1,347 @@
+---
+title: "R_HW3.Rmd"
+output: pdf_document
+date: "2023-02-07"
+---
+read in directly from website: 
+```{r}
+trees <- read.csv('https://raw.githubusercontent.com/dmcglinn/quant_methods/gh-pages/data/treedata_subset.csv')
+```
+
+see how data is structured
+```{r}
+str(trees)
+```
+Question 1: Carry out an exploratory analysis using the tree dataset. Metadata for the tree study can be found here. Specifically, I would like you to develop and compare models for species cover for a habitat generalist Acer rubrum (Red maple) and a habitat specialist Abies fraseri (Frasier fir). Because this dataset includes both continuous and discrete explanatory variables use the function Anova in the packages car as such
+
+```{r}
+install.packages('car')
+library(car)
+Anova(my_mod, type=3)
+```
+
+This will estimate partial effect sizes, variance explained, and p-values for each explanatory variable included in the model.
+
+Compare the p-values you observe using the function Anova to those generated using summary.
+
+We wish to model species cover across all sampled plots
+Create site x sp matrix for two species 
+
+```{r}
+sp_cov = with(trees, tapply(cover, list(plotID, spcode), 
+                            function(x) round(mean(x))))
+sp_cov = ifelse(is.na(sp_cov), 0, sp_cov)
+sp_cov = data.frame(plotID = row.names(sp_cov), sp_cov)
+# create environmental matrix
+cols_to_select = c('elev', 'tci', 'streamdist', 'disturb', 'beers')
+env = aggregate(trees[ , cols_to_select], by = list(trees$plotID), 
+                function(x) x[1])
+names(env)[1] = 'plotID'
+# merge species and enviornmental matrices
+site_dat = merge(sp_cov, env, by='plotID')
+# subset species of interest
+abies = site_dat[ , c('ABIEFRA', cols_to_select)]
+acer  = site_dat[ , c('ACERRUB', cols_to_select)]
+names(abies)[1] = 'cover'
+names(acer)[1] = 'cover'
+```
+
+```{r}
+plot(cover ~ elev, data = abies, xlab = 'elev',
+     ylab = 'cover')
+
+plot(cover ~ elev, data = acer, xlab = 'elev',
+     ylab = 'cover')
+
+plot(cover ~ tci, data = abies, xlab = 'tci',
+     ylab = 'cover')
+
+plot(cover ~ tci, data = acer, xlab = 'tci',
+     ylab = 'cover')
+
+plot(cover ~ streamdist, data = abies, xlab = 'streamdist',
+     ylab = 'cover')
+
+plot(cover ~ streamdist, data = acer, xlab = 'streamdist',
+     ylab = 'cover')
+
+boxplot(cover ~ disturb, data = abies, xlab='disturb', 
+        ylab = 'cover')
+
+boxplot(cover ~ disturb, data = acer, xlab='disturb', 
+        ylab = 'cover')
+
+plot(cover ~ beers, data = abies, xlab = 'beers',
+     ylab = 'cover')
+
+plot(cover ~ beers, data = acer, xlab = 'beers',
+     ylab = 'cover')
+```
+
+For each species address the following additional questions:
+
+1.) How well does the exploratory model appear to explain cover?
+
+
+
+Main Effects Model (abies)
+```{r}
+abies_main_mod <- lm(cover ~ elev + streamdist, data = abies)
+Anova(abies_main_mod, type=3)
+plot(abies_main_mod)
+```
+
+Interactions Model (abies)
+```{r}
+abies_int_mod <- lm(cover ~ elev * streamdist, data = abies)
+Anova(abies_int_mod, type=3)
+plot(abies_int_mod)
+
+
+```
+Model Interpretation: abies
+```{r}
+summary(abies_main_mod)
+anova(abies_main_mod)
+summary(abies_int_mod)
+anova(abies_int_mod)
+```
+
+
+Comparison Model (Adjusted R^2): abies
+```{r}
+summary(abies_main_mod)
+summary(abies_int_mod)
+
+# Log-ratio test
+anova(abies_main_mod, abies_int_mod)
+```
+According to the Anova above, the abies_int_mod is a better fit becuase of a significantly lower p-value (2.2e-16 ***).
+
+Main Effects Model: acer
+```{r}
+acer_main_mod <- lm(cover ~ elev + streamdist, data = acer)
+Anova(acer_main_mod, type=3)
+plot(acer_main_mod)
+```
+ Interactions Model: acer
+```{r}
+acer_int_mod <- lm(cover ~ elev * streamdist, data = acer)
+Anova(acer_int_mod, type=3)
+plot(acer_int_mod)
+
+```
+ Model Interpretation: acer
+```{r}
+summary(acer_main_mod)
+anova(acer_main_mod)
+summary(acer_int_mod)
+anova(acer_int_mod)
+```
+ 
+Comparison Model (Adjusted R^2): acer
+```{r}
+summary(acer_main_mod)
+summary(acer_int_mod)
+
+# Log-ratio test
+anova(acer_main_mod, acer_int_mod)
+``` 
+According to the Anova above, acer_int_mod is the better fit due to a significant p value of 0.01251 *.
+
+ 
+ 2.) Which explanatory variables are the most important?
+ 
+Abies: 
+```{r}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+  par(usr = c(0, 1, 0, 1))
+  r <- abs(cor(x, y))
+  txt <- format(c(r, 0.123456789), digits = digits)[1]
+  txt <- paste0(prefix, txt)
+  if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+pairs(~cover+elev+tci+streamdist+beers, data = abies, upper.panel=panel.smooth, lower.panel=panel.cor)
+```
+ 
+According to the plot above, cover and elevation have the most significance (large 0.45) for the Abies spp.
+
+Acer:
+```{r}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+  par(usr = c(0, 1, 0, 1))
+  r <- abs(cor(x, y))
+  txt <- format(c(r, 0.123456789), digits = digits)[1]
+  txt <- paste0(prefix, txt)
+  if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+pairs(~cover+elev+tci+streamdist+beers, data = acer, upper.panel=panel.smooth, lower.panel=panel.cor)
+```
+
+ Cover and elevation are the most significant for acer as well (large 0.39)
+ 
+3.) Do model diagnostics indicate any problems with violations of OLS assumptions?
+
+Abies:
+```{r}
+par(mfrow = c(2,2))
+plot(abies_main_mod)
+```
+The two left plots show that the homoscedastity assumption does not work. The top right panel shows that it is normally distributed to a point and then skews and so it does not meet that OLS assumption. And the bottom right plot shows that there several  outliers that are leveraging the regression. Therefore, they are all violoations of the OLS assumptions. 
+
+
+Acer:
+```{r}
+par(mfrow = c(2,2))
+plot(acer_main_mod)
+```
+The two left plots show that the homoscedastity assumption works to a point and then does not work. The top right panel shows that it is in fact normally distributed. And the bottom right plot shows that there are no main outliers that are leveraging the regression. Therefore, there are a few violations of the OLS assumptions. 
+
+4.) Are you able to explain variance in one species better than another, why might this be the case?
+
+```{r}
+#modeling for acer, looking at all variables 
+acer_mod_lm <- lm(cover ~ ., data=acer)
+Anova(acer_mod_lm, type =3) #update drops intercept because we have a categorical variable
+summary(acer_mod_lm)
+#Anova and Summary generate same p-value
+
+#modeling for abies, looking at all variables 
+abies_mod_lm <- lm(cover~ ., data=abies)
+Anova(abies_mod_lm, type =3) #update drops intercept because we have a categorical variable
+summary(abies_mod_lm)
+#Anova and Summary also generate same p-value
+```
+Based on adjusted r^2 values and comparing the graphs and models, you can better explain vairance in in the abies species as its adjusted r^2=0.2406, meaning 24% of the variability observed in the target variable (cover) was explained. In contrast, Acer had an r^2=0.1726, meaning only 17.26% of the variability observed in the target variable was explained by the model.
+
+
+Question 2: You may have noticed that the variable cover is defined as positive integers between 1 and 10. and is therefore better treated as a discrete rather than continuous variable. Re-examine your solutions to the question above but from the perspective of a General Linear Model (GLM) with a Poisson error term (rather than a Gaussian one as in OLS). The Poisson distribution generates integers 0 to positive infinity so this may provide a good first approximation. Your new model calls will look as follows:
+
+Acer:
+```{r}
+acer_poi = glm(cover ~ tci + elev + streamdist + disturb + beers, data = acer, 
+                 family='poisson')
+
+plot(acer_poi)
+
+pseudo_r2 = function(glm_mod) {
+                1 -  glm_mod$deviance / glm_mod$null.deviance
+            }
+```
+Abies:
+```{r}
+abies_poi = glm(cover ~ tci + elev + streamdist + disturb + beers, data = abies, 
+                 family='poisson')
+
+plot(abies_poi)
+
+pseudo_r2 = function(glm_mod) {
+                1 -  glm_mod$deviance / glm_mod$null.deviance
+}
+
+abies_glm_model <- glm(cover ~ elev + streamdist + beers + disturb + tci, 
+                    data = abies, family = "poisson")
+
+pseudo_r2_value <- pseudo_r2(abies_glm_model)
+
+pseudo_r2_value
+```
+
+Acer:
+```{r}
+acers_poi = glm(cover ~ tci + elev + streamdist + disturb + beers, data = acer, 
+                 family='poisson')
+
+plot(acer_poi)
+
+pseudo_r2 = function(glm_mod) {
+                1 -  glm_mod$deviance / glm_mod$null.deviance
+}
+
+acer_glm_model <- glm(cover ~ elev + streamdist + beers + disturb + tci, 
+                    data = acer, family = "poisson")
+
+pseudo_r2_value <- pseudo_r2(acer_glm_model)
+
+pseudo_r2_value
+```
+
+# Compare your qualitative assessment of which variables were most important in each model. Does it appear that changing the error distribution changed the results much? In what ways?
+
+GLM provides a better fit for the cover than OLS. The pseudo-R-squared values (measure of the goodness-of-fit of the model) = 0.8951796 for abies and 0.1342074 for acer. Additionally, the residual plots, residuals versus fitted values, and residuals versus leverage plots appear a better fit. 
+
+The variables most important to each model are:
+Abies:
+```{r}
+# fit the OLS model
+abies_ols_model <- lm(cover ~ elev + tci + streamdist + beers, data = abies)
+
+# fit the GLM model
+abies_glm_model <- glm(cover ~ elev + tci + streamdist + beers, 
+                    data = abies, family = "poisson")
+
+# get the OLS coefficients and significance
+summary(abies_ols_model)
+
+# get the GLM coefficients and significance
+summary(abies_glm_model)
+```
+The variables most important to GLM models for Abies are elevation (p=2e-16), stream distance (p=0.00722), and tci (p=0.00314), whereas OLS only includes elevation and streamdist.
+
+Acer:
+```{r}
+# fit the OLS model
+acer_ols_model <- lm(cover ~ elev + tci + streamdist + beers, data = acer)
+
+# fit the GLM model
+acer_glm_model <- glm(cover ~ elev + tci + streamdist + beers, 
+                    data = acer, family = "poisson")
+
+# get the OLS coefficients and significance
+summary(acer_ols_model)
+
+# get the GLM coefficients and significance
+summary(acer_glm_model)
+```
+The variables most important to GLM models for Acer are elevation (p=2e-16), beers (p=0.000873), and tci (p=0.000180, whereas OLS had less significant values for streamdist and beers.
+
+
+Changing the error distribution changed the results for both Acer and Abies:
+Abies:
+```{r}
+# fit the OLS model
+abies_ols_model <- lm(cover ~ elev + tci + streamdist + beers, data = abies)
+plot(abies_ols_model)
+
+# fit the GLM model
+abies_glm_model <- glm(cover ~ elev + tci + streamdist + beers, 
+                    data = abies, family = "poisson")
+plot(abies_glm_model)
+```
+
+Acer:
+```{r}
+# fit the OLS model
+acer_ols_model <- lm(cover ~ elev + tci + streamdist + beers, data = acer)
+plot(acer_ols_model)
+
+# fit the GLM model
+acer_glm_model <- glm(cover ~ elev + tci + streamdist + beers, 
+                    data = acer, family = "poisson")
+plot(acer_glm_model)
+```
+
+The graphs above show the comparisons between OLS and GLM modeling, both expressing different estimates of the coefficients and different measures of goodness of fit. Additionally, they use different measures of goodness of fit (r^2 versus pseudo r^2) which might account for GLM being a better fit.
+
+
+
+Question 3: Provide a plain English summary (i.e., no statistics) of what you have found and what conclusions we can take away from your analysis?
+
+Thanks to the different models above, we can confidently determine what are the most important factors driving percent cover for abies and acer trees, and the differences between the two species. Acer percent cover is most influenced by elevation and then secondly topographic convergence index (tci), and transformed slope aspect (beers). Similarly, Abies is most influenced by elevation; however, it differs in that it secondly favors stream distance and topographic convergence index (tci). Given that both species' percent cover is most influenced by elevation, the remaining differences are best explained by the GLM models that show less violations than the OLS model. 
+
