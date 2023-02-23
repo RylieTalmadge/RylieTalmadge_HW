@@ -1,0 +1,107 @@
+---
+title: "HW4"
+output: html_document
+date: "2023-02-21"
+---
+
+```{r}
+library(vegan)
+data(dune)
+data(dune.env)
+?dune
+```
+
+Question 1: Conduct an indirect ordination on the dune plant community. Specifically, visually examine a NMDS plot using the bray-curtis distance metric. Below is some code to help you develop a potential plot that emphasizes the role of the environmental variable “Moisture”. Describe how you interpret the graphic. What is the goal of creating such a plot? Does this analysis suggest any interesting findings with respect to the dune vegetation?
+
+```{r}
+set.seed(123)
+dune_mds <- metaMDS(dune, distance = "bray")
+
+plot(dune_mds, type='n')
+ text(dune_mds, 'sp', cex=.5)
+ # generate vector of colors 
+ color_vect = rev(terrain.colors(6))[-1]
+ points(dune_mds, 'sites', pch=19, 
+        col=color_vect[dune.env$Moisture])
+ legend('topright', paste("Moisture =", 1:5, sep=''), 
+        col=color_vect, pch=19)
+```
+#' This plot helps visualize the similarity between plant communities based on the Bray-Curtis distance metric (which measures the dissimilarity in species composition). Meaning samples that are closer together are more similar in species composition than samples that are farther apart. The points show the moisture level of each sample (moisture levels according to color key). According to this, there is a clear moisture gradient (i.e., relationship between moisture and the distribution of dune plants). 
+
+```{r}
+ordiplot(dune_mds, type = "n", main = "NMDS plot")
+points(dune_mds, display = "sites", col = dune.env$Management)
+ordiplot(dune.mds, type = "n", main = "NMDS plot")
+points(dune.mds, display = "sites", col = dune.env$Management)
+ordiellipse(dune.mds, groups = dune.env$Moisture, kind = "se", label = TRUE)
+
+ # generate vector of colors 
+ color_vect = rev(terrain.colors(6))[-1]
+ points(dune_mds, 'sites', pch=19, 
+        col=color_vect[dune.env$Moisture])
+ legend('topright', paste("Moisture =", 1:5, sep=''), 
+        col=color_vect, pch=19)
+```
+#' Overall, the analysis suggests that both moisture levels and management type are important factors in determining the distribution and abundance of plant species in the dune vegetation.
+
+```{r}
+dune_pca <- rda(dune)
+dune_pca
+str(dune_pca)
+dune_pca$tot.chi
+dune_pca$CA$eig
+sum(dune_pca$CA$eig)
+# verify that this is equal to the sum of the variances (i.e., diagonal elements) in the species covariance matrix 
+sum(diag(cov(dune)))
+cen_dune <- apply(dune, 2, function(x) x - mean(x))
+cov_dune <- nrow(dune)^-1 * t(cen_dune) %*% cen_dune
+sum(diag(cov_dune))
+round(dune_pca$CA$eig / dune_pca$tot.chi, 2)
+plot(dune_pca)
+biplot(dune_pca)
+ordiplot(dune_pca, display = 'sp')
+dune_ca <- cca(dune)
+dune_ca
+```
+
+
+Question 2: Carry out a direct ordination using CCA in order to test any potential hypotheses that you developed after examining the MDS plot. Specifically, carry out a test of the entire model (i.e., including all constrained axes) and also carry out tests at the scale of individual explanatory variables you included in your model if you included more than one variable. Plot your results.
+
+```{r}
+cca_dune <- cca(dune ~ ., data=dune.env)
+RsquareAdj(cca_dune, 100)
+
+anova(cca_dune, permutations = 999)
+
+anova(cca_dune, by='margin', permutations = 999)
+
+plot(cca_dune, type='n', scaling=1)
+orditorp(cca_dune, display='sp', cex=0.5, scaling=1, col='blue')
+text(cca_dune, display='bp', col='red')
+
+```
+```{r}
+# Fit CCA using formula interface
+dune.cca <- cca(dune ~ ., data = dune.env)
+
+# Perform CCA with individual variables
+dune.cca.Moisture <- cca(dune, dune.env$Moisture)
+dune.cca.A1 <- cca(dune, dune.env$A1)
+
+anova(dune.cca, by="axis", step=2)
+
+plot(dune.cca)
+
+```
+#' Overall, CCA can help us test the relationships between the environmental variables and the species in the dune dataset, and can provide insight into which variables are most important for explaining the distribution and abundance of species. By examining the significance of individual axes and creating biplots, we can gain a better understanding of the relationships between variables (Moisture, Management and Maure, etc.) and species in the dataset. Even though the p-value for Moisture is not extremely signicant, compared to the other variables in the CCA analysis.
+
+
+Question 3: Do your two analyses agree with one another or complement one another or do these two analyses seem to be suggesting different take home messages? Which analysis do you find to be more useful?
+
+#' The MDS analysis was useful for visualizing the overall pattern of similarity or dissimilarity among the samples in a multivariate data set. However, it does not provide any information about the relationship between the species abundance data and the environment.
+#' The CCA analysis, on the other hand, tested the relationship between the species abundance data and the environmental variables. This showed that variables (Moisture) are most strongly associated with the species abundance data, and therefore find it more accurate and useful of the two.
+
+
+
+
+
