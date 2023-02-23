@@ -1,6 +1,7 @@
 ---
 title: "HW4"
-output: html_document
+output:
+  html_document: default
 date: "2023-02-21"
 ---
 
@@ -31,9 +32,9 @@ plot(dune_mds, type='n')
 ```{r}
 ordiplot(dune_mds, type = "n", main = "NMDS plot")
 points(dune_mds, display = "sites", col = dune.env$Management)
-ordiplot(dune.mds, type = "n", main = "NMDS plot")
-points(dune.mds, display = "sites", col = dune.env$Management)
-ordiellipse(dune.mds, groups = dune.env$Moisture, kind = "se", label = TRUE)
+ordiplot(dune_mds, type = "n", main = "NMDS plot")
+points(dune_mds, display = "sites", col = dune.env$Management)
+ordiellipse(dune_mds, groups = dune.env$Moisture, kind = "se", label = TRUE)
 
  # generate vector of colors 
  color_vect = rev(terrain.colors(6))[-1]
