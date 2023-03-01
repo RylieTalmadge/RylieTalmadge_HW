@@ -88,13 +88,6 @@ model2 <- glm(Drypetes.standleyi ~ ., data = subset_df, family = poisson)
 summary(model1)
 summary(model2)
 
-bci_sub <- subset(BCI, select =  c("Cordia.lasiocalyx", "Hirtella.triandra",
-           "Picramnia.latifolia", "Quassia.amara",
-           "Tabernaemontana.arborea", "Trattinnickia.aspera", 
-           "Xylopia.macrantha"))
-
-bci_sub_spat <- cbind(bci_sub, BCI_xy) #adds spatial location data
-
 #use function Variogram for all predictor species 
 vario_prespec <- Variogram(gls_prespec, form= ~ BCI$Drypetes.standleyi + bci_sub_spat, resType = 'response')
 
