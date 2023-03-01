@@ -1,0 +1,149 @@
+---
+title: "HW5"
+output: pdf_document
+date: "2023-02-23"
+---
+
+```{r}
+library(vegan)
+data(BCI)
+## UTM Coordinates (in metres)
+BCI_xy = data.frame(x = rep(seq(625754, 626654, by=100), each=5), 
+                    y = rep(seq(1011569,  1011969, by=100), len=50))
+?BCI
+head(BCI_xy)
+head (BCI)
+dim(BCI)
+dim(BCI_xy)
+
+```
+
+#' 1) Examine if there is evidence of spatial dependence in a rare and a common species in the BCI tree dataset
+
+```{r}
+# Find out what data is rare and what is common (25% and 75% quantiles)
+names(BCI)
+sad <- colSums(BCI)
+hist(log(sad))
+quantile(log(sad), probs = c(0.25, 0.75), na.rm = FALSE)
+exp(1.9459)
+which(log(sad) == quantile(log(sad), 0.25))
+rare_species <- 'Ficus.obtusifolia'
+which(log(sad) == quantile(log(sad), 0.75))
+common_species <- 'Trichilia.pallida'
+
+BCI_species <- BCI[, c(rare_species, common_species)]
+
+# Calculating Euclidean distances
+rare_dist = dist(BCI$Tetrathylacium.johansenii, method = "euclidean")
+common_dist = dist(BCI$Trichilia.pallida, method = "euclidean")
+xy_dist = dist(BCI_xy, method = "euclidean")
+
+max_dist <- max(BCI_xy) / 2
+
+# Plotting these distances and linear models, then calculated correlations
+plot(xy_dist, rare_dist)
+abline(lm(rare_dist ~ xy_dist), lwd=3, col='red')
+lines(lowess(xy_dist, rare_dist), lwd=3, col='pink')
+abline(v = max_dist, col='red', lwd=3, lty=2)
+
+rare_cor = cor(xy_dist, rare_dist)
+rare_cor
+
+plot(xy_dist, common_dist)
+abline(lm(common_dist~ xy_dist), lwd=3, col='red')
+lines(lowess(xy_dist, common_dist), lwd=3, col='pink')
+abline(v = max_dist, col='red', lwd=3, lty=2)
+
+common_cor = cor (xy_dist, common_dist)
+common_cor
+
+# Performing permutation tests to compare these correlations to a null distribution
+rare_mantel = mantel(xy_dist, rare_dist)
+rare_mantel
+
+common_mantel = mantel(xy_dist, common_dist)
+common_mantel
+```
+# The result of the mantel test shows r-0.08744 meaning there is a significant correlation between the spatial distance matrix (xdis = dw) and the species distance matrix (ydis = Wmat). This shows that there is evidence of spatial dependence in the rare and common species selected.
+
+2) Build two generalized linear models to predict the abundance of the species Drypetes standleyi using the abundance of other tree species in the study site. Specifically examine the following species as predictor variables:
+
+```{r}
+sp_ids = c("Cordia.lasiocalyx", "Hirtella.triandra",
+           "Picramnia.latifolia", "Quassia.amara",
+           "Tabernaemontana.arborea", "Trattinnickia.aspera", 
+           "Xylopia.macrantha")
+
+# create a subset of the data with the target and predictor variables
+subset_df <- BCI[, c("Drypetes.standleyi", sp_ids)]
+
+# Model 1: only include a single species as a predictor variable
+model1 <- glm(Drypetes.standleyi ~ Cordia.lasiocalyx, data = subset_df, family = poisson)
+
+# Model 2: include all of the species as predictor variables
+model2 <- glm(Drypetes.standleyi ~ ., data = subset_df, family = poisson)
+
+# view the summary of the models
+summary(model1)
+summary(model2)
+
+bci_sub <- subset(BCI, select =  c("Cordia.lasiocalyx", "Hirtella.triandra",
+           "Picramnia.latifolia", "Quassia.amara",
+           "Tabernaemontana.arborea", "Trattinnickia.aspera", 
+           "Xylopia.macrantha"))
+
+bci_sub_spat <- cbind(bci_sub, BCI_xy) #adds spatial location data
+
+#use function Variogram for all predictor species 
+vario_prespec <- Variogram(gls_prespec, form= ~ BCI$Drypetes.standleyi + bci_sub_spat, resType = 'response')
+
+#compare to a plot we make on our own 
+res <- residuals(gls_prespec)
+res_var <- dist(res)^2 * 0.5
+plot(dist(BCI[, c(BCI$Drypetes.standleyi, bci_sub_spat)]), res_var)
+lines(lowess(dist(BCI[, c(BCI$Drypetes.standleyi, bci_sub_spat)]), res_var), col='red', lwd=2)
+abline(v = max_dist, col='red', lwd=3, lty=2)
+
+library(geoR)
+
+# calculate residuals for both models
+resid1 <- residuals(model1, type = "response")
+resid2 <- residuals(model2, type = "response")
+
+# calculate empirical variogram of the residuals for both models
+vg1 <- Variogram(as.list(as.data.frame(coordinates(BCI))), resid1)
+vg2 <- Variogram(as.list(as.data.frame(coordinates(BCI))), resid2)
+
+
+# plot the variograms
+plot(vg1, main = "Empirical Variogram of Residuals (Model 1)")
+plot(vg2, main = "Empirical Variogram of Residuals (Model 2)")
+
+
+# fit exponential model to the residuals of model 1
+expfit1 <- likfit(vg1, ini.cov.pars = c(0.1, 0.1))
+
+# fit exponential model to the residuals of model 2
+expfit2 <- likfit(vg2, ini.cov.pars = c(0.1, 0.1))
+
+
+# fit model 1 with spatial error term
+model1_spatial <- glmmadmb(Drypetes.standleyi ~ Cordia.lasiocalyx, data = BCI, 
+                            random = ~ x + y, family = "nbinom")
+
+# fit model 2 with spatial error term
+model2_spatial <- glmmadmb(Drypetes.standleyi ~ ., data = BCI, 
+                            random = ~ x + y, family = "nbinom")
+
+# compare model fit with anova
+anova(model1, model1_spatial, test = "Chisq")
+anova(model2, model2_spatial, test = "Chisq")
+
+```
+
+Did including the spatial error term have a large impact on the coefficients of the model?
+
+Did including the spatial error terms significantly improve model fit (use function anova to carry out model comparison)?
+
+Explain why you did or did not observe a difference in the influence of adding the spatial error term between the two models.
